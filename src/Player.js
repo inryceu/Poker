@@ -19,7 +19,35 @@ class Player {
 
     this._friends = [];
 
-    this.addPlayerToDB();
+    this.checkIfPlayerExists(loggin, (exists) => {
+      if (exists) {
+        console.log("Гравець з таким логіном вже існує");
+      } else {
+        this.addPlayerToDB();
+      }
+    });
+  }
+
+  checkIfPlayerExists(loggin, callback) {
+    const connection = mysql.createConnection(CONFIG);
+    connection.connect((err) => {
+      if (err) {
+        console.error(err);
+        return;
+      }
+
+      const query = "SELECT COUNT(*) AS count FROM Player WHERE loggin = ?";
+      connection.query(query, [loggin], (err, results) => {
+        if (err) {
+          console.error(err);
+          return;
+        }
+
+        callback(results[0].count > 0);
+
+        connection.end();
+      });
+    });
   }
 
   addPlayerToDB() {
@@ -160,4 +188,4 @@ class Player {
 }
 
 //USAGE
-const p1 = new Player("qwerty", "123");
+const p1 = new Player("ytrewq", "123");
