@@ -1,6 +1,7 @@
 "use strict";
 
 const mysql = require("mysql");
+const bcrypt = require("bcrypt");
 const CONFIG = require("./config");
 
 class Player {
@@ -50,23 +51,25 @@ class Player {
     });
   }
 
-  addPlayerToDB() {
+  async addPlayerToDB() {
     const connection = mysql.createConnection(CONFIG);
 
-    connection.connect((err) => {
+    connection.connect(async (err) => {
       if (err) {
         console.error(err);
         return;
       }
 
       const query = "SELECT MAX(id) AS lastId FROM Player";
-      connection.query(query, (err, results) => {
+      connection.query(query, async (err, result) => {
         if (err) {
           console.error(err);
           return;
         }
 
-        this._id = results[0].lastId ? results[0].lastId + 1 : 1;
+        this._id = result[0].lastId ? result[0].lastId + 1 : 1;
+
+        const hashedPassword = await this.hashPassword(this._password);
 
         const queryPlayer = `INSERT INTO Player (id, loggin, password, balance, stack, biggestGain, biggestLose) 
                              VALUES (?, ?, ?, ?, ?, ?, ?)`;
@@ -74,7 +77,7 @@ class Player {
         const values = [
           this._id,
           this._loggin,
-          this._password,
+          hashedPassword,
           this._balance,
           this._stack,
           this._biggestGain,
@@ -84,10 +87,36 @@ class Player {
         connection.query(queryPlayer, values, (err) => {
           if (err) {
             console.error(err);
+          } else {
+            console.log("Гравця успішно додано, ID:", this._id);
           }
 
           connection.end();
         });
+      });
+    });
+  }
+
+  hashPassword(password) {
+    return new Promise((res, rej) => {
+      bcrypt.hash(password, 10, (err, hash) => {
+        if (err) {
+          rej("Помилка хешування паролю");
+        } else {
+          res(hash);
+        }
+      });
+    });
+  }
+
+  static checkPassword(storedPassword, enteredPassword) {
+    return new Promise((resolve, reject) => {
+      bcrypt.compare(enteredPassword, storedPassword, (err, result) => {
+        if (err) {
+          reject("Помилка порівняння паролю");
+        } else {
+          resolve(result);
+        }
       });
     });
   }
@@ -188,4 +217,16 @@ class Player {
 }
 
 //USAGE
-const p1 = new Player("ytrewq", "123");
+const p1 = new Player("qwerty123!", "123");
+const connection = mysql.createConnection(CONFIG);
+const query = "SELECT password FROM Player WHERE loggin = 'qwerty123!'";
+connection.query(query, (err, res) => {
+  if (err) {
+    console.error(err);
+  }
+  const pass = res[0].password;
+  Player.checkPassword(pass, "123").then((response) => {
+    console.log(response); //true
+  });
+  connection.end();
+});
