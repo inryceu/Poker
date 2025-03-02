@@ -16,9 +16,9 @@ class Player {
     this._biggestLose = 0;
 
     this._session = null;
-    this._cards = [];
+    this._cards = new Set();
 
-    this._friends = [];
+    this._friends = new Set();
 
     this.checkIfPlayerExists(loggin, (exists) => {
       if (exists) {
@@ -34,17 +34,19 @@ class Player {
     connection.connect((err) => {
       if (err) {
         console.error(err);
+        callback(true);
         return;
       }
 
       const query = "SELECT COUNT(*) AS count FROM Player WHERE loggin = ?";
-      connection.query(query, [loggin], (err, results) => {
+      connection.query(query, [loggin], (err, result) => {
         if (err) {
           console.error(err);
+          callback(true);
           return;
         }
 
-        callback(results[0].count > 0);
+        callback(result[0].count > 0);
 
         connection.end();
       });
@@ -163,12 +165,94 @@ class Player {
     this._biggestLose = newBiggestLose;
   }
 
-  addFriend(id) {
-    //this.friends.push();
+  addFriend(loggin) {
+    this.checkIfPlayerExists(loggin, (result) => {
+      if (result) {
+        const connection = mysql.createConnection(CONFIG);
+
+        const queryPlayer = "SELECT friends FROM Player WHERE loggin = ?";
+        connection.query(queryPlayer, [this._loggin], (err, result) => {
+          if (err) {
+            console.error(err);
+            connection.end();
+            return;
+          }
+
+          let friendsList = [];
+          if (result.length > 0 && result[0].friends) {
+            try {
+              friendsList = JSON.parse(result[0].friends);
+            } catch (parseErr) {
+              console.error(parseErr);
+            }
+          }
+
+          if (!friendsList.includes(loggin) && this._loggin !== loggin) {
+            friendsList.push(loggin);
+          }
+
+          this._friends = new Set(friendsList);
+
+          const queryUpdate = "UPDATE Player SET friends = ? WHERE loggin = ?";
+          connection.query(
+            queryUpdate,
+            [JSON.stringify([...this._friends]), this._loggin],
+            (err) => {
+              if (err) {
+                console.error(err);
+              }
+              connection.end();
+            }
+          );
+        });
+      }
+    });
   }
-  deleteFriend(id) {
-    //
+
+  deleteFriend(loggin) {
+    this.checkIfPlayerExists(loggin, (result) => {
+      if (result) {
+        const connection = mysql.createConnection(CONFIG);
+
+        const queryPlayer = "SELECT friends FROM Player WHERE loggin = ?";
+        connection.query(queryPlayer, [this._loggin], (err, result) => {
+          if (err) {
+            console.error(err);
+            connection.end();
+            return;
+          }
+
+          let friendsList = [];
+          if (result.length > 0 && result[0].friends) {
+            try {
+              friendsList = JSON.parse(result[0].friends);
+            } catch (parseErr) {
+              console.error("JSON Parse Error:", parseErr);
+            }
+          }
+
+          const newFriendsList = friendsList.filter(
+            (friend) => friend !== loggin
+          );
+
+          this._friends = new Set(newFriendsList);
+
+          const queryUpdate = "UPDATE Player SET friends = ? WHERE loggin = ?";
+          connection.query(
+            queryUpdate,
+            [JSON.stringify([...this._friends]), this._loggin],
+            (err) => {
+              if (err) {
+                console.error(err);
+              }
+              connection.end();
+            }
+          );
+        });
+      }
+    });
   }
+
   get friends() {
     return this._friends;
   }
@@ -217,7 +301,10 @@ class Player {
 }
 
 //USAGE
-const p1 = new Player("qwerty123!", "123");
+const p1 = new Player("ytrewq", "123");
+const p2 = new Player("qwerty", "123");
+const p3 = new Player("qwerty123!", "123");
+
 const connection = mysql.createConnection(CONFIG);
 const query = "SELECT password FROM Player WHERE loggin = 'qwerty123!'";
 connection.query(query, (err, res) => {
@@ -230,3 +317,13 @@ connection.query(query, (err, res) => {
   });
   connection.end();
 });
+
+p3.addFriend("ytrewq");
+p3.addFriend("qwerty");
+p3.addFriend("qwerty123");
+p3.addFriend("qwerty123!");
+
+p3.deleteFriend("ytrewq");
+p3.deleteFriend("qwerty");
+p3.deleteFriend("qwerty123");
+p3.deleteFriend("qwerty123!");
