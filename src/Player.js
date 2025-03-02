@@ -4,6 +4,19 @@ const mysql = require("mysql");
 const bcrypt = require("bcrypt");
 const CONFIG = require("./config");
 
+const PROPERTIES = [
+  "loggin",
+  "password",
+  "id",
+  "balance",
+  "stack",
+  "biggestGain",
+  "biggestLose",
+  "session",
+  "cards",
+  "friends",
+];
+
 class Player {
   constructor(loggin, password) {
     this._loggin = loggin;
@@ -19,84 +32,20 @@ class Player {
     this._cards = new Set();
 
     this._friends = new Set();
-
-    this.checkIfPlayerExists(loggin, (exists) => {
-      if (exists) {
-        console.log("Гравець з таким логіном вже існує");
-      } else {
-        this.addPlayerToDB();
-      }
-    });
   }
 
-  checkIfPlayerExists(loggin, callback) {
+  static async checkIfPlayerExists(loggin) {
     const connection = mysql.createConnection(CONFIG);
-    connection.connect((err) => {
-      if (err) {
-        console.error(err);
-        callback(true);
-        return;
-      }
-
+    try {
+      await connection.connect();
       const query = "SELECT COUNT(*) AS count FROM Player WHERE loggin = ?";
-      connection.query(query, [loggin], (err, result) => {
-        if (err) {
-          console.error(err);
-          callback(true);
-          return;
-        }
-
-        callback(result[0].count > 0);
-
-        connection.end();
-      });
-    });
-  }
-
-  async addPlayerToDB() {
-    const connection = mysql.createConnection(CONFIG);
-
-    connection.connect(async (err) => {
-      if (err) {
-        console.error(err);
-        return;
-      }
-
-      const query = "SELECT MAX(id) AS lastId FROM Player";
-      connection.query(query, async (err, result) => {
-        if (err) {
-          console.error(err);
-          return;
-        }
-
-        this._id = result[0].lastId ? result[0].lastId + 1 : 1;
-
-        const hashedPassword = await this.hashPassword(this._password);
-
-        const queryPlayer = `INSERT INTO Player (id, loggin, password, balance, stack, biggestGain, biggestLose) 
-                             VALUES (?, ?, ?, ?, ?, ?, ?)`;
-
-        const values = [
-          this._id,
-          this._loggin,
-          hashedPassword,
-          this._balance,
-          this._stack,
-          this._biggestGain,
-          this._biggestLose,
-        ];
-
-        connection.query(queryPlayer, values, (err) => {
-          if (err) {
-            console.error(err);
-          } else {
-            console.log("Гравця успішно додано, ID:", this._id);
-          }
-
-          connection.end();
-        });
-      });
-    });
+      const [result] = await connection.query(query, [loggin]);
+      return result[0].count > 0;
+    } catch (err) {
+      console.error(err);
+    } finally {
+      connection.end();
+    }
   }
 
   hashPassword(password) {
@@ -133,6 +82,9 @@ class Player {
   get id() {
     return this._id;
   }
+  set id(newId) {
+    this._id = newId;
+  }
 
   get balance() {
     return this._balance;
@@ -166,7 +118,7 @@ class Player {
   }
 
   addFriend(loggin) {
-    this.checkIfPlayerExists(loggin, (result) => {
+    Player.checkIfPlayerExists(loggin, (result) => {
       if (result) {
         const connection = mysql.createConnection(CONFIG);
 
@@ -210,7 +162,7 @@ class Player {
   }
 
   deleteFriend(loggin) {
-    this.checkIfPlayerExists(loggin, (result) => {
+    Player.checkIfPlayerExists(loggin, (result) => {
       if (result) {
         const connection = mysql.createConnection(CONFIG);
 
@@ -256,6 +208,9 @@ class Player {
   get friends() {
     return this._friends;
   }
+  set friends(newFriends) {
+    this._friends = newFriends;
+  }
 
   startNewSession() {
     //
@@ -298,32 +253,108 @@ class Player {
   allIn() {
     this._stack = 0;
   }
+
+  static loadPropertyToBD(loggin, whatToSearch, newValue) {
+    Player.checkIfPlayerExists(loggin, (result) => {
+      if (result) {
+        const connection = mysql.createConnection(CONFIG);
+
+        const queryPlayer = `UPDATE Player SET ${whatToSearch} = ? WHERE loggin = ?`;
+        connection.query(queryPlayer, [newValue, loggin], (err, result) => {
+          if (err) {
+            console.error(err);
+            connection.end();
+            return;
+          }
+        });
+      }
+    });
+  }
+  async loadPlayerToBD() {
+    const exists = await Player.checkIfPlayerExists(this._loggin);
+    if (exists) {
+      console.log("Гравець з таким логіном вже існує");
+      return;
+    }
+
+    const connection = mysql.createConnection(CONFIG);
+    try {
+      await connection.connect();
+      const query = "SELECT MAX(id) AS lastId FROM Player";
+      const [result] = await connection.query(query);
+      this._id = result[0].lastId ? result[0].lastId + 1 : 1;
+
+      const hashedPassword = await this.hashPassword(this._password);
+
+      const queryPlayer = `INSERT INTO Player (id, loggin, password, balance, stack, biggestGain, biggestLose) 
+                           VALUES (?, ?, ?, ?, ?, ?, ?)`;
+      const values = [
+        this._id,
+        this._loggin,
+        hashedPassword,
+        this._balance,
+        this._stack,
+        this._biggestGain,
+        this._biggestLose,
+      ];
+
+      await connection.query(queryPlayer, values);
+      console.log("Гравця успішно додано, ID:", this._id);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      connection.end();
+    }
+  }
+  static async loadPropertyToBD(loggin, whatToSearch, newValue) {
+    const exists = await Player.checkIfPlayerExists(loggin);
+    if (exists) {
+      const connection = mysql.createConnection(CONFIG);
+      try {
+        await connection.connect();
+        const queryPlayer = `UPDATE Player SET ${whatToSearch} = ? WHERE loggin = ?`;
+        await connection.query(queryPlayer, [newValue, loggin]);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        connection.end();
+      }
+    }
+  }
+  static async loadPlayerFromBD(loggin, password) {
+    const player = new Player(loggin, password);
+
+    const propertyPromises = PROPERTIES.map((property) => {
+      return Player.loadPropertyFromDB(loggin, property).then((result) => {
+        if (result && result[0] && result[0][property] !== undefined) {
+          player[property] = result[0][property];
+        }
+      });
+    });
+
+    await Promise.all(propertyPromises);
+
+    return player;
+  }
+  deleteAccount() {
+    Player.checkIfPlayerExists(this._loggin, (result) => {
+      if (result) {
+        const connection = mysql.createConnection(CONFIG);
+
+        const query = "DELETE FROM Player WHERE loggin = ?";
+        connection.query(query, [this._loggin], (err) => {
+          if (err) {
+            console.error(err);
+          } else {
+            console.log(`Аккаунт ${this._loggin} видалено`);
+          }
+          connection.end();
+        });
+      } else {
+        console.log(`Аккаунт ${this._loggin} не існує`);
+      }
+    });
+  }
 }
 
 //USAGE
-const p1 = new Player("ytrewq", "123");
-const p2 = new Player("qwerty", "123");
-const p3 = new Player("qwerty123!", "123");
-
-const connection = mysql.createConnection(CONFIG);
-const query = "SELECT password FROM Player WHERE loggin = 'qwerty123!'";
-connection.query(query, (err, res) => {
-  if (err) {
-    console.error(err);
-  }
-  const pass = res[0].password;
-  Player.checkPassword(pass, "123").then((response) => {
-    console.log(response); //true
-  });
-  connection.end();
-});
-
-p3.addFriend("ytrewq");
-p3.addFriend("qwerty");
-p3.addFriend("qwerty123");
-p3.addFriend("qwerty123!");
-
-p3.deleteFriend("ytrewq");
-p3.deleteFriend("qwerty");
-p3.deleteFriend("qwerty123");
-p3.deleteFriend("qwerty123!");
