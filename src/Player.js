@@ -1,6 +1,6 @@
 "use strict";
 
-const mysql = require("mysql");
+const mysql = require("mysql2/promise");
 const bcrypt = require("bcrypt");
 const CONFIG = require("./config");
 
@@ -35,16 +35,17 @@ class Player {
   }
 
   static async checkIfPlayerExists(loggin) {
-    const connection = mysql.createConnection(CONFIG);
     try {
-      await connection.connect();
-      const query = "SELECT COUNT(*) AS count FROM Player WHERE loggin = ?";
-      const [result] = await connection.query(query, [loggin]);
+      const connection = await mysql.createConnection(CONFIG);
+      const [result] = await connection.execute(
+        "SELECT COUNT(*) AS count FROM Player WHERE loggin = ?",
+        [loggin]
+      );
+      await connection.end();
       return result[0].count > 0;
     } catch (err) {
       console.error(err);
-    } finally {
-      connection.end();
+      return false;
     }
   }
 
@@ -64,7 +65,7 @@ class Player {
     return new Promise((resolve, reject) => {
       bcrypt.compare(enteredPassword, storedPassword, (err, result) => {
         if (err) {
-          reject("Помилка порівняння паролю");
+          reject(err);
         } else {
           resolve(result);
         }
@@ -117,92 +118,72 @@ class Player {
     this._biggestLose = newBiggestLose;
   }
 
-  addFriend(loggin) {
-    Player.checkIfPlayerExists(loggin, (result) => {
-      if (result) {
-        const connection = mysql.createConnection(CONFIG);
+  async addFriend(loggin) {
+    const exists = await Player.checkIfPlayerExists(loggin);
+    if (!exists) return;
 
-        const queryPlayer = "SELECT friends FROM Player WHERE loggin = ?";
-        connection.query(queryPlayer, [this._loggin], (err, result) => {
-          if (err) {
-            console.error(err);
-            connection.end();
-            return;
-          }
-
-          let friendsList = [];
-          if (result.length > 0 && result[0].friends) {
-            try {
-              friendsList = JSON.parse(result[0].friends);
-            } catch (parseErr) {
-              console.error(parseErr);
-            }
-          }
-
-          if (!friendsList.includes(loggin) && this._loggin !== loggin) {
-            friendsList.push(loggin);
-          }
-
-          this._friends = new Set(friendsList);
-
-          const queryUpdate = "UPDATE Player SET friends = ? WHERE loggin = ?";
-          connection.query(
-            queryUpdate,
-            [JSON.stringify([...this._friends]), this._loggin],
-            (err) => {
-              if (err) {
-                console.error(err);
-              }
-              connection.end();
-            }
-          );
-        });
+    const connection = await mysql.createConnection(CONFIG);
+    try {
+      const [result] = await connection.execute(
+        "SELECT friends FROM Player WHERE loggin = ?",
+        [this._loggin]
+      );
+      let friendsList = [];
+      if (result.length > 0 && result[0].friends) {
+        try {
+          friendsList = JSON.parse(result[0].friends);
+        } catch (parseError) {
+          friendsList = [];
+        }
       }
-    });
+
+      if (!friendsList.includes(loggin) && this._loggin !== loggin) {
+        friendsList.push(loggin);
+      }
+
+      this._friends = new Set(friendsList);
+      await connection.execute(
+        "UPDATE Player SET friends = ? WHERE loggin = ?",
+        [JSON.stringify([...this._friends]), this._loggin]
+      );
+    } catch (err) {
+      console.error(err);
+    } finally {
+      await connection.end();
+    }
   }
 
-  deleteFriend(loggin) {
-    Player.checkIfPlayerExists(loggin, (result) => {
-      if (result) {
-        const connection = mysql.createConnection(CONFIG);
+  async deleteFriend(loggin) {
+    const exists = await Player.checkIfPlayerExists(loggin);
+    if (!exists) return;
 
-        const queryPlayer = "SELECT friends FROM Player WHERE loggin = ?";
-        connection.query(queryPlayer, [this._loggin], (err, result) => {
-          if (err) {
-            console.error(err);
-            connection.end();
-            return;
-          }
-
-          let friendsList = [];
-          if (result.length > 0 && result[0].friends) {
-            try {
-              friendsList = JSON.parse(result[0].friends);
-            } catch (parseErr) {
-              console.error("JSON Parse Error:", parseErr);
-            }
-          }
-
-          const newFriendsList = friendsList.filter(
-            (friend) => friend !== loggin
-          );
-
-          this._friends = new Set(newFriendsList);
-
-          const queryUpdate = "UPDATE Player SET friends = ? WHERE loggin = ?";
-          connection.query(
-            queryUpdate,
-            [JSON.stringify([...this._friends]), this._loggin],
-            (err) => {
-              if (err) {
-                console.error(err);
-              }
-              connection.end();
-            }
-          );
-        });
+    const connection = await mysql.createConnection(CONFIG);
+    try {
+      const [result] = await connection.execute(
+        "SELECT friends FROM Player WHERE loggin = ?",
+        [this._loggin]
+      );
+      let friendsList = [];
+      if (result.length > 0 && result[0].friends) {
+        try {
+          friendsList = JSON.parse(result[0].friends);
+        } catch (parseError) {
+          friendsList = [];
+        }
       }
-    });
+
+      const newFriendsList = friendsList.filter((friend) => friend !== loggin);
+      this._friends = new Set(newFriendsList);
+
+      await connection.execute(
+        "UPDATE Player SET friends = ? WHERE loggin = ?",
+        [JSON.stringify([...this._friends]), this._loggin]
+      );
+    } catch (err) {
+      console.error("Помилка при видаленні друга:", err);
+    } finally {
+      await connection.end();
+    }
   }
 
   get friends() {
@@ -254,21 +235,22 @@ class Player {
     this._stack = 0;
   }
 
-  static loadPropertyToBD(loggin, whatToSearch, newValue) {
-    Player.checkIfPlayerExists(loggin, (result) => {
-      if (result) {
-        const connection = mysql.createConnection(CONFIG);
+  static async loadPropertyToBD(loggin, whatToSearch, newValue) {
+    const exists = await Player.checkIfPlayerExists(loggin);
+    if (exists) {
+      const connection = await mysql.createConnection(CONFIG);
 
-        const queryPlayer = `UPDATE Player SET ${whatToSearch} = ? WHERE loggin = ?`;
-        connection.query(queryPlayer, [newValue, loggin], (err, result) => {
-          if (err) {
-            console.error(err);
-            connection.end();
-            return;
-          }
-        });
+      try {
+        await connection.execute(
+          `UPDATE Player SET ${whatToSearch} = ? WHERE loggin = ?`,
+          [newValue, loggin]
+        );
+      } catch (err) {
+        console.error(err);
+      } finally {
+        await connection.end();
       }
-    });
+    }
   }
   async loadPlayerToBD() {
     const exists = await Player.checkIfPlayerExists(this._loggin);
@@ -277,84 +259,139 @@ class Player {
       return;
     }
 
-    const connection = mysql.createConnection(CONFIG);
+    const connection = await mysql.createConnection(CONFIG);
     try {
-      await connection.connect();
-      const query = "SELECT MAX(id) AS lastId FROM Player";
-      const [result] = await connection.query(query);
-      this._id = result[0].lastId ? result[0].lastId + 1 : 1;
+      const [result] = await connection.execute(
+        "SELECT MAX(id) AS lastId FROM Player"
+      );
+      this._id = result[0].lastId !== null ? result[0].lastId + 1 : 1;
 
+      if (!this._password) {
+        throw new Error("Пароль не може бути undefined!");
+      }
       const hashedPassword = await this.hashPassword(this._password);
 
-      const queryPlayer = `INSERT INTO Player (id, loggin, password, balance, stack, biggestGain, biggestLose) 
-                           VALUES (?, ?, ?, ?, ?, ?, ?)`;
       const values = [
         this._id,
         this._loggin,
         hashedPassword,
-        this._balance,
-        this._stack,
-        this._biggestGain,
-        this._biggestLose,
+        this._balance ?? 0,
+        this._stack ?? 0,
+        this._biggestGain ?? 0,
+        this._biggestLose ?? 0,
+        JSON.stringify([...(this._friends || [])]),
       ];
 
-      await connection.query(queryPlayer, values);
+      const queryPlayer = `INSERT INTO Player (id, loggin, password, balance, stack, biggestGain, biggestLose, friends) 
+                           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`;
+
+      await connection.execute(queryPlayer, values);
       console.log("Гравця успішно додано, ID:", this._id);
     } catch (err) {
-      console.error(err);
+      console.error("Помилка під час додавання гравця:", err);
     } finally {
-      connection.end();
+      await connection.end();
     }
   }
-  static async loadPropertyToBD(loggin, whatToSearch, newValue) {
-    const exists = await Player.checkIfPlayerExists(loggin);
-    if (exists) {
-      const connection = mysql.createConnection(CONFIG);
-      try {
-        await connection.connect();
-        const queryPlayer = `UPDATE Player SET ${whatToSearch} = ? WHERE loggin = ?`;
-        await connection.query(queryPlayer, [newValue, loggin]);
-      } catch (err) {
-        console.error(err);
-      } finally {
-        connection.end();
-      }
+  static async loadPropertyFromDB(loggin, whatToSearch) {
+    try {
+      const connection = await mysql.createConnection(CONFIG);
+      const [result] = await connection.execute(
+        `SELECT ${whatToSearch} FROM Player WHERE loggin = ?`,
+        [loggin]
+      );
+      await connection.end();
+      return result.length > 0 ? result[0][whatToSearch] : null;
+    } catch (err) {
+      console.error(err);
+      return null;
     }
   }
   static async loadPlayerFromBD(loggin, password) {
     const player = new Player(loggin, password);
 
-    const propertyPromises = PROPERTIES.map((property) => {
-      return Player.loadPropertyFromDB(loggin, property).then((result) => {
-        if (result && result[0] && result[0][property] !== undefined) {
-          player[property] = result[0][property];
-        }
-      });
-    });
-
-    await Promise.all(propertyPromises);
+    for (const property of PROPERTIES) {
+      player[property] = await Player.loadPropertyFromDB(loggin, property);
+    }
 
     return player;
   }
-  deleteAccount() {
-    Player.checkIfPlayerExists(this._loggin, (result) => {
-      if (result) {
-        const connection = mysql.createConnection(CONFIG);
+  async deleteAccount() {
+    const exists = await Player.checkIfPlayerExists(this._loggin);
+    if (exists) {
+      const connection = await mysql.createConnection(CONFIG);
 
-        const query = "DELETE FROM Player WHERE loggin = ?";
-        connection.query(query, [this._loggin], (err) => {
-          if (err) {
-            console.error(err);
-          } else {
-            console.log(`Аккаунт ${this._loggin} видалено`);
-          }
-          connection.end();
-        });
-      } else {
-        console.log(`Аккаунт ${this._loggin} не існує`);
+      try {
+        connection.execute("DELETE FROM Player WHERE loggin = ?", [
+          this._loggin,
+        ]);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        await connection.end();
       }
-    });
+    }
   }
 }
-
 //USAGE
+
+async function createNewPlayer() {
+  const newPlayer = new Player("john_doe", "securePassword123");
+  const newPlayer2 = new Player("jane_smith", "securePassword123");
+  await newPlayer.loadPlayerToBD();
+  await newPlayer2.loadPlayerToBD();
+}
+
+// Перевірка, чи існує гравець
+async function checkPlayerExistence() {
+  const exists = await Player.checkIfPlayerExists("john_doe");
+  console.log("Гравець існує:", exists);
+}
+
+// Завантаження гравця з бази даних
+async function loadExistingPlayer() {
+  const player = await Player.loadPlayerFromBD("john_doe", "securePassword123");
+  console.log(`Гравця завантажено:`, player);
+}
+
+// Додавання друга
+async function addFriendExample() {
+  const player = await Player.loadPlayerFromBD("john_doe", "securePassword123");
+  await player.addFriend("jane_smith");
+  console.log(`Друг "jane_smith" доданий`);
+}
+
+// Видалення друга
+async function removeFriendExample() {
+  const player = await Player.loadPlayerFromBD("john_doe", "securePassword123");
+  await player.deleteFriend("jane_smith");
+  console.log(`Друг "jane_smith" видалений`);
+}
+
+// Поповнення балансу
+async function updateBalanceExample() {
+  const player = await Player.loadPlayerFromBD("john_doe", "securePassword123");
+  player.balance = 1000;
+  await Player.loadPropertyToBD(player.loggin, "balance", player.balance);
+  console.log(`Баланс оновлено на ${player.balance}`);
+}
+
+// Видалення акаунта
+async function deleteAccountExample() {
+  const player = await Player.loadPlayerFromBD("john_doe", "securePassword123");
+  await player.deleteAccount();
+  console.log(`Акаунт "john_doe" видалено`);
+}
+
+// Виклик функцій
+async function usage() {
+  await createNewPlayer();
+  await checkPlayerExistence();
+  await loadExistingPlayer();
+  await addFriendExample();
+  await removeFriendExample();
+  await updateBalanceExample();
+  await deleteAccountExample();
+}
+
+usage();
