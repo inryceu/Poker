@@ -35,8 +35,8 @@ class Player {
   }
 
   static async checkIfPlayerExists(loggin) {
+    const connection = await mysql.createConnection(CONFIG);
     try {
-      const connection = await mysql.createConnection(CONFIG);
       const [result] = await connection.execute(
         "SELECT COUNT(*) AS count FROM Player WHERE loggin = ?",
         [loggin]
@@ -237,19 +237,18 @@ class Player {
 
   static async loadPropertyToBD(loggin, whatToSearch, newValue) {
     const exists = await Player.checkIfPlayerExists(loggin);
-    if (exists) {
-      const connection = await mysql.createConnection(CONFIG);
+    if (!exists) return;
 
-      try {
-        await connection.execute(
-          `UPDATE Player SET ${whatToSearch} = ? WHERE loggin = ?`,
-          [newValue, loggin]
-        );
-      } catch (err) {
-        console.error(err);
-      } finally {
-        await connection.end();
-      }
+    const connection = await mysql.createConnection(CONFIG);
+    try {
+      await connection.execute(
+        `UPDATE Player SET ${whatToSearch} = ? WHERE loggin = ?`,
+        [newValue, loggin]
+      );
+    } catch (err) {
+      console.error(err);
+    } finally {
+      await connection.end();
     }
   }
   async loadPlayerToBD() {
@@ -288,14 +287,14 @@ class Player {
       await connection.execute(queryPlayer, values);
       console.log("Гравця успішно додано, ID:", this._id);
     } catch (err) {
-      console.error("Помилка під час додавання гравця:", err);
+      console.error(err);
     } finally {
       await connection.end();
     }
   }
   static async loadPropertyFromDB(loggin, whatToSearch) {
+    const connection = await mysql.createConnection(CONFIG);
     try {
-      const connection = await mysql.createConnection(CONFIG);
       const [result] = await connection.execute(
         `SELECT ${whatToSearch} FROM Player WHERE loggin = ?`,
         [loggin]
@@ -308,6 +307,17 @@ class Player {
     }
   }
   static async loadPlayerFromBD(loggin, password) {
+    try {
+      const hashedPassword = await Player.loadPropertyFromDB(
+        loggin,
+        "password"
+      );
+      const exists = await Player.checkPassword(hashedPassword, password);
+      if (!exists) return null;
+    } catch (err) {
+      return null;
+    }
+
     const player = new Player(loggin, password);
 
     for (const property of PROPERTIES) {
@@ -318,18 +328,15 @@ class Player {
   }
   async deleteAccount() {
     const exists = await Player.checkIfPlayerExists(this._loggin);
-    if (exists) {
-      const connection = await mysql.createConnection(CONFIG);
+    if (!exists) return;
 
-      try {
-        connection.execute("DELETE FROM Player WHERE loggin = ?", [
-          this._loggin,
-        ]);
-      } catch (err) {
-        console.error(err);
-      } finally {
-        await connection.end();
-      }
+    const connection = await mysql.createConnection(CONFIG);
+    try {
+      connection.execute("DELETE FROM Player WHERE loggin = ?", [this._loggin]);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      await connection.end();
     }
   }
 }

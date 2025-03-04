@@ -3,12 +3,12 @@
 class Session {
   constructor(startBalance, minBet, maxBet, raiseValue, roundTime, admin) {
     this._id = 0;
-    this._players = [];
+    this._players = new Set();
     this._admin = admin;
-    this._inGame.push(admin);
+    this._inGame = new Set();
     this._curentPlayer = admin;
-    this._bigBlind = null;
-    this._smallBlind = null;
+    this._bigBlind = "";
+    this._smallBlind = "";
 
     this._startBalance = startBalance;
     this._minBet = minBet;
@@ -36,14 +36,14 @@ class Session {
     return this._smallBlind;
   }
 
-  addPlayer(id) {
+  addPlayer(loggin) {
     //this.players.push()
   }
-  deletePlayer(id) {
+  deletePlayer(loggin) {
     //
   }
 
-  deleteFromRound(id) {
+  deleteFromRound(loggin) {
     //
   }
   refillPlayers() {
