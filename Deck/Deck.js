@@ -1,6 +1,6 @@
 "use strict";
 
-const Card = require("./Card");
+import Card from "./Card";
 
 const SUITS = ["♥", "♦", "♣", "♠"];
 const VALUES = [

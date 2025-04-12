@@ -1,6 +1,6 @@
 "use strict";
 
-const dbPromise = require("../DB/db");
+import dbPromise from "../DB/db.js";
 
 async function createSession(
   admin,
@@ -49,27 +49,4 @@ async function updateSessionProperty(id, property, value) {
   await db.run(`UPDATE sessions SET ${property} = ? WHERE id = ?`, value, id);
 }
 
-//Usage
-async function usage() {
-  console.log("\n*** Створення нової сесії ***");
-  const session = await createSession("admin123", 1000, 10, 100, 5, 30);
-  console.log("Створена сесія:", session);
-
-  console.log("\n*** Отримання сесії за ID ***");
-  const loadedSession = await getSessionById(session.id);
-  console.log("Завантажена сесія:", loadedSession);
-
-  console.log("\n*** Оновлення поточної ставки ***");
-  await updateSessionProperty(session.id, "curentBet", 50);
-  console.log("Поточну ставку оновленно");
-
-  console.log("\n*** Отримання сесії після оновлення ***");
-  const updatedSession = await getSessionById(session.id);
-  console.log("Сесія після оновлення:", updatedSession);
-
-  console.log("\n*** Видалення сесії ***");
-  await deleteSession(session.id);
-  console.log("Сесію видалено");
-}
-
-usage();
+export { createSession, getSessionById, deleteSession, updateSessionProperty };

@@ -1,6 +1,6 @@
 "use strict";
 
-module.exports = class Card {
+export default class Card {
   constructor(suit, value, id) {
     this._suit = suit;
     this._value = value;
@@ -31,4 +31,4 @@ module.exports = class Card {
   draw() {
     console.log(this);
   }
-};
+}
