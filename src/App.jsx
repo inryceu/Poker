@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, } from "react";
 import AuthPage from "./AuthPage";
 import ProfilePage from "./ProfilePage";
 
@@ -21,7 +21,13 @@ function App() {
             try {
                 const data = JSON.parse(event.data);
                 console.log("Отримано повідомлення від сервера:", data);
-                setUser(data.player);
+
+                if (data.player) {
+                    setUser(data.player);
+                    localStorage.setItem("user", JSON.stringify(data.player));
+                }
+
+                if(data.status === "error") alert(data.message)
             } catch (error) {
                 console.error("Помилка парсингу повідомлення:", error);
             }
@@ -44,7 +50,6 @@ function App() {
 
     const handleAuth = (login, password, isNewAccount) => {
         console.log(isNewAccount ? "Реєстрація" : "Вхід", login);
-        setUser(login);
 
         const data = {
             type: isNewAccount ? "create" : "auth",
@@ -60,11 +65,21 @@ function App() {
         setUser(null);
         localStorage.removeItem("user");
     };
+
+    const handleAddFriend = (login, friendLogin) => {
+        const data = {
+            type: "addFriend",
+            login, 
+            friendLogin
+        };
+        socket.send(JSON.stringify(data));
+        console.log("Відправлено на сервер:", data);
+    };
         
     return (
         <div>
             {user ? (
-                <ProfilePage user={user} socket={socket} onLogout={handleLogout}/>
+                <ProfilePage user={user} onLogout={handleLogout} onAddFriend={handleAddFriend}/>
             ) : (
                 <AuthPage onAuthenticate={handleAuth} />
             )}

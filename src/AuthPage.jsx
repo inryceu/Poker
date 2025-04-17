@@ -7,9 +7,13 @@ const AuthPage = ({ onAuthenticate }) => {
 
     const handleAuth = () => {
         if (username.trim() && password.trim()) {
+            if(password.length < 2) {
+                alert("Занадто короткий пароль");
+                return;
+            }
             onAuthenticate(username, password, isNewAccount);
         }
-    };
+    };  
 
     return (
         <>
@@ -24,7 +28,7 @@ const AuthPage = ({ onAuthenticate }) => {
             </div>
             <div>
                 <input
-                    type="text"
+                    type="password"
                     placeholder="Пароль"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}

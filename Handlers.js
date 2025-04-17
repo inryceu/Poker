@@ -1,26 +1,61 @@
 import {
+  addFriend,
   createNewPlayer,
+  checkPassword,
   loadPlayerFromDB,
+  loadPropertyFromDB,
 } from "./Repositories/PlayerRepository.js";
 
 const handlers = {
   create: async (data, ws) => {
-    await createNewPlayer(data.login, data.password);
-    const player = await loadPlayerFromDB(data.login, data.password);
-
-    const response = player
-      ? { status: "success", player }
-      : { status: "error", player: null };
+    const player = await createNewPlayer(data.login, data.password);
+    const response =
+      player !== null
+        ? { status: "success", player }
+        : {
+            status: "error",
+            message: "Такий логін вже зареєстровано",
+            player: null,
+          };
 
     ws.send(JSON.stringify(response));
   },
 
   auth: async (data, ws) => {
-    const player = await loadPlayerFromDB(data.login, data.password);
+    try {
+      const hashedPassword = await loadPropertyFromDB(data.login, "password");
+      const isValidPassword = await checkPassword(
+        hashedPassword,
+        data.password
+      );
+      if (!isValidPassword) return false;
+    } catch (err) {
+      if (err) return false;
+    }
 
-    const response = player
+    const player = await loadPlayerFromDB(data.login);
+
+    const response =
+      player !== null
+        ? { status: "success", player }
+        : {
+            status: "error",
+            message: "Неправильний логін або пароль",
+            player: null,
+          };
+
+    ws.send(JSON.stringify(response));
+  },
+
+  addFriend: async (data, ws) => {
+    const result = await addFriend(data.login, data.friendLogin);
+    const player = await loadPlayerFromDB(data.login);
+    const response = result
       ? { status: "success", player }
-      : { status: "error", player: null };
+      : {
+          status: "error",
+          message: "Такого користувача не існує",
+        };
 
     ws.send(JSON.stringify(response));
   },

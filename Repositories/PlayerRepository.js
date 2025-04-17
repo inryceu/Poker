@@ -32,7 +32,7 @@ async function checkPassword(storedPassword, enteredPassword) {
 async function addFriend(login, friendLogin) {
   const existsLogin = await checkIfPlayerExists(login);
   const existsFriendLogin = await checkIfPlayerExists(friendLogin);
-  if (!existsLogin || !existsFriendLogin) return;
+  if (!existsLogin || !existsFriendLogin) return false;
 
   const db = await dbPromise;
   const row = await db.get("SELECT friends FROM Player WHERE login = ?", login);
@@ -42,11 +42,8 @@ async function addFriend(login, friendLogin) {
     friendsList.push(friendLogin);
   }
 
-  await db.run(
-    "UPDATE Player SET friends = ? WHERE login = ?",
-    JSON.stringify(friendsList),
-    login
-  );
+  await updatePlayerProperty(login, "friends", JSON.stringify(friendsList));
+  return true;
 }
 
 async function deleteFriend(login, friendLogin) {
@@ -88,18 +85,10 @@ async function loadPropertyFromDB(login, property) {
   return row ? row[property] : null;
 }
 
-async function loadPlayerFromDB(login, password) {
-  try {
-    const hashedPassword = await loadPropertyFromDB(login, "password");
-    const isValidPassword = await checkPassword(hashedPassword, password);
-    if (!isValidPassword) return null;
-  } catch (err) {
-    if (err) return null;
-  }
-
+async function loadPlayerFromDB(login) {
   const player = {
     login,
-    password,
+    password: "",
     balance: 0,
     stack: 0,
     biggestGain: 0,
@@ -127,7 +116,7 @@ async function deleteAccount(login) {
 async function createNewPlayer(login, password) {
   if (await checkIfPlayerExists(login)) {
     console.log("Гравець з таким логіном вже існує");
-    return false;
+    return null;
   }
 
   const hashedPassword = await hashPassword(password);
@@ -140,7 +129,17 @@ async function createNewPlayer(login, password) {
   );
 
   console.log("Гравця успішно додано");
-  return true;
+  return {
+    login,
+    password: hashPassword(password),
+    balance: 0,
+    stack: 0,
+    biggestGain: 0,
+    biggestLose: 0,
+    session: null,
+    cards: [],
+    friends: [],
+  };
 }
 
 export {

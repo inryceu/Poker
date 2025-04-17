@@ -1,14 +1,29 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
-function ProfilePage({ user, onLogout }) {
+function ProfilePage({ user, onLogout, onAddFriend }) {
     const [friendName, setFriendName] = useState("");
     const [sessionCode, setSessionCode] = useState("");
+    const [friends, setFriends] = useState([]);
+
+    useEffect(() => {
+        if (user.friends) {
+            try {
+                const parsed = JSON.parse(user.friends);
+                setFriends(parsed);
+            } catch (err) {
+                alert(err);
+                setFriends([]);
+            }
+        }
+    }, [user]);
 
     const handleAddFriend = () => {
-        if (friendName.trim()) {
-            alert(`Додано друга: ${friendName}`);
-            setFriendName("");
+        if (!friendName.trim() || user.login === friendName) {
+            alert(`Значення '${friendName}' недопустиме`);
+            return;
         }
+        onAddFriend(user.login, friendName);
+        setFriendName("");
     };
 
     const handleJoinSession = () => {
@@ -21,6 +36,17 @@ function ProfilePage({ user, onLogout }) {
     return (
         <div>
             <h2>Привіт, {user.login}!</h2>
+
+            <h3>Твої друзі:</h3>
+            <ul>
+                {friends.length > 0 ? (
+                    friends.map((friend, index) => (
+                        <li key={index}>{friend}</li>
+                    ))
+                ) : (
+                    <li>Немає друзів</li>
+                )}
+            </ul>
 
             <div>
                 <input
