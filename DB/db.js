@@ -22,7 +22,7 @@ async function initDB() {
   `);
 
   await db.exec(`
-    CREATE TABLE IF NOT EXISTS sessions (
+    CREATE TABLE IF NOT EXISTS Session (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       admin TEXT NOT NULL,
       startBalance INTEGER NOT NULL,

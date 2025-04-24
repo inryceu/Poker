@@ -1,10 +1,12 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 
-function ProfilePage({ user, onLogout, onAddFriend }) {
+function ProfilePage({ user, onLogout, onAddFriend, onDeleteFriend, }) {
     const [friendName, setFriendName] = useState("");
     const [sessionCode, setSessionCode] = useState("");
     const [friends, setFriends] = useState([]);
-
+    const navigate = useNavigate();
+    
     useEffect(() => {
         if (user.friends) {
             try {
@@ -16,7 +18,7 @@ function ProfilePage({ user, onLogout, onAddFriend }) {
             }
         }
     }, [user]);
-
+    
     const handleAddFriend = () => {
         if (!friendName.trim() || user.login === friendName) {
             alert(`Значення '${friendName}' недопустиме`);
@@ -25,14 +27,23 @@ function ProfilePage({ user, onLogout, onAddFriend }) {
         onAddFriend(user.login, friendName);
         setFriendName("");
     };
-
+    
+    const handleDeleteFriend = () => {
+        if (!friendName.trim() || user.login === friendName) {
+            alert(`Значення '${friendName}' недопустиме`);
+            return;
+        }
+        onDeleteFriend(user.login, friendName);
+        setFriendName("");
+    }
+    
     const handleJoinSession = () => {
         if (sessionCode.trim()) {
             alert(`Спроба доєднатися до сесії: ${sessionCode}`);
             setSessionCode("");
         }
     };
-
+    
     return (
         <div>
             <h2>Привіт, {user.login}!</h2>
@@ -56,6 +67,7 @@ function ProfilePage({ user, onLogout, onAddFriend }) {
                     onChange={(e) => setFriendName(e.target.value)}
                 />
                 <button onClick={handleAddFriend}>Додати друга</button>
+                <button onClick={handleDeleteFriend}>Видалити друга</button>
             </div>
 
             <div>
@@ -65,11 +77,13 @@ function ProfilePage({ user, onLogout, onAddFriend }) {
                     value={sessionCode}
                     onChange={(e) => setSessionCode(e.target.value)}
                 />
-                <button onClick={handleJoinSession}>Доєднатися до сесії</button>
+                <button onClick={handleJoinSession}>
+                    Доєднатися до сесії
+                </button>
             </div>
 
             <div>
-                <button onClick={() => alert("Створено нову ігрову сесію!")}>
+                <button onClick={() => navigate("/session")}>
                     Створити ігрову сесію
                 </button>
             </div>

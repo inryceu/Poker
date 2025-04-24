@@ -49,7 +49,7 @@ async function addFriend(login, friendLogin) {
 async function deleteFriend(login, friendLogin) {
   const existsLogin = await checkIfPlayerExists(login);
   const existsFriendLogin = await checkIfPlayerExists(friendLogin);
-  if (!existsLogin || !existsFriendLogin) return;
+  if (!existsLogin || !existsFriendLogin) return false;
 
   const db = await dbPromise;
   const row = await db.get("SELECT friends FROM Player WHERE login = ?", login);
@@ -62,6 +62,8 @@ async function deleteFriend(login, friendLogin) {
     JSON.stringify(friendsList),
     login
   );
+
+  return true;
 }
 
 async function updatePlayerProperty(login, property, newValue) {
@@ -107,10 +109,12 @@ async function loadPlayerFromDB(login) {
 
 async function deleteAccount(login) {
   const exists = await checkIfPlayerExists(login);
-  if (!exists) return;
+  if (!exists) return false;
 
   const db = await dbPromise;
   await db.run("DELETE FROM Player WHERE login = ?", login);
+
+  return true;
 }
 
 async function createNewPlayer(login, password) {
