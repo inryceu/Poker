@@ -10,8 +10,9 @@ server.listen(8080, () => {
   console.log("WebSocket сервер працює на ws://localhost:8080");
 });
 
+const ctx = new Map();
+
 wss.on("connection", (ws) => {
-  const ctx = {};
   console.log("Новий гравець підключився");
 
   ws.on("message", async (message) => {
@@ -25,7 +26,7 @@ wss.on("connection", (ws) => {
         throw new AppError("Невідомий тип запиту");
       }
 
-      response = await handler(ctx, data);
+      response = await handler(ctx, data, ws);
     } catch (error) {
       console.log("Помилка обробки повідомлення:", error.message);
 
@@ -34,7 +35,7 @@ wss.on("connection", (ws) => {
         message: error.message || "Сталася невідома помилка",
       };
     } finally {
-      ws.send(JSON.stringify(response));
+      if (response) ws.send(JSON.stringify(response));
     }
   });
 

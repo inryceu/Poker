@@ -1,9 +1,9 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 
-function ProfilePage({ user, onLogout, onAddFriend, onDeleteFriend, }) {
+function ProfilePage({ user, onLogout, onAddFriend, onDeleteFriend, onJoinSession}) {
     const [friendName, setFriendName] = useState("");
-    const [sessionCode, setSessionCode] = useState("");
+    const [sessionID, setSessionID] = useState("");
     const [friends, setFriends] = useState([]);
     const navigate = useNavigate();
     
@@ -38,10 +38,14 @@ function ProfilePage({ user, onLogout, onAddFriend, onDeleteFriend, }) {
     }
     
     const handleJoinSession = () => {
-        if (sessionCode.trim()) {
-            alert(`Спроба доєднатися до сесії: ${sessionCode}`);
-            setSessionCode("");
+        const id = Number.parseInt(sessionID);
+        if (!sessionID.trim() || isNaN(id)) {
+            alert("ID сессії має бути числом");
+            return
         }
+
+        onJoinSession(user.login, id);
+        setSessionID("");
     };
     
     return (
@@ -73,9 +77,9 @@ function ProfilePage({ user, onLogout, onAddFriend, onDeleteFriend, }) {
             <div>
                 <input
                     type="text"
-                    placeholder="Код сесії"
-                    value={sessionCode}
-                    onChange={(e) => setSessionCode(e.target.value)}
+                    placeholder="ID сесії"
+                    value={sessionID}
+                    onChange={(e) => setSessionID(e.target.value)}
                 />
                 <button onClick={handleJoinSession}>
                     Доєднатися до сесії

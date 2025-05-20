@@ -25,6 +25,7 @@ async function initDB() {
     CREATE TABLE IF NOT EXISTS Session (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       admin TEXT NOT NULL,
+      players TEXT DEFAULT '[]',
       startBalance INTEGER NOT NULL,
       minBet INTEGER NOT NULL,
       maxBet INTEGER NOT NULL,
