@@ -1,15 +1,15 @@
-const sqlite = require("sqlite");
-const sqlite3 = require("sqlite3");
+import sqlite3 from "sqlite3";
+import { open } from "sqlite";
 
 async function initDB() {
-  const db = await sqlite.open({
+  const db = await open({
     filename: "./DB/database.db",
-    driver: sqlite3.Database, // Важливо: Вказуємо драйвер для node:sqlite
+    driver: sqlite3.Database,
   });
 
   await db.exec(`
     CREATE TABLE IF NOT EXISTS Player (
-      loggin TEXT PRIMARY KEY,
+      login TEXT PRIMARY KEY,
       password TEXT NOT NULL,
       balance INTEGER DEFAULT 0,
       stack INTEGER DEFAULT 0,
@@ -22,9 +22,10 @@ async function initDB() {
   `);
 
   await db.exec(`
-    CREATE TABLE IF NOT EXISTS sessions (
+    CREATE TABLE IF NOT EXISTS Session (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       admin TEXT NOT NULL,
+      players TEXT DEFAULT '[]',
       startBalance INTEGER NOT NULL,
       minBet INTEGER NOT NULL,
       maxBet INTEGER NOT NULL,
@@ -38,4 +39,4 @@ async function initDB() {
 }
 
 const dbPromise = initDB();
-module.exports = dbPromise;
+export default dbPromise;

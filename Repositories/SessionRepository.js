@@ -1,75 +1,106 @@
 "use strict";
 
-const dbPromise = require("../DB/db");
+import dbPromise from "../DB/db.js";
 
-async function createSession(
-  admin,
-  startBalance,
-  minBet,
-  maxBet,
-  raiseValue,
-  roundTime
-) {
+async function createSession(admin, startBalance, minBet, maxBet, roundTime) {
   const curentBet = minBet;
+  const raiseValue = minBet;
+  const players = [admin];
 
   const db = await dbPromise;
   const result = await db.run(
-    `INSERT INTO sessions (admin, startBalance, minBet, maxBet, curentBet, raiseValue, roundTime)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO Session (admin, players, startBalance, minBet, maxBet, curentBet, raiseValue, roundTime)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      admin,
+      JSON.stringify(players),
+      startBalance,
+      minBet,
+      maxBet,
+      curentBet,
+      raiseValue,
+      roundTime,
+    ]
+  );
+
+  return {
+    id: result.lastID,
     admin,
+    players,
     startBalance,
     minBet,
     maxBet,
     curentBet,
     raiseValue,
-    roundTime
-  );
-
-  return { id: result.lastID };
+    roundTime,
+  };
 }
 
 async function getSessionById(id) {
   const db = await dbPromise;
-  return db.get(`SELECT * FROM sessions WHERE id = ?`, id);
+  const row = await db.get(`SELECT * FROM Session WHERE id = ?`, id);
+  if (!row) return null;
+
+  row.players = row.players ? JSON.parse(row.players) : [];
+
+  return row;
+}
+
+async function joinSession(login, id) {
+  const db = await dbPromise;
+  const row = await db.get(`SELECT players FROM Session WHERE id = ?`, [id]);
+  let players = row ? JSON.parse(row.players) : [];
+
+  if (!players.includes(login)) {
+    players = [...players, login];
+    await updateSessionProperty(id, "players", players);
+  }
+
+  return players;
+}
+
+async function leaveSession(login, id) {
+  const db = await dbPromise;
+  const row = await db.get(`SELECT players FROM Session WHERE id = ?`, [id]);
+  let players = row ? JSON.parse(row.players) : [];
+
+  if (!players.includes(login)) return [];
+
+  players = players.filter((player) => player != login);
+  if (players.length === 0) {
+    await deleteSession(id);
+    return [];
+  }
+  await updateSessionProperty(id, "players", players);
+  return players;
 }
 
 async function deleteSession(id) {
   const db = await dbPromise;
-  await db.run(`DELETE FROM sessions WHERE id = ?`, id);
+  await db.run(`DELETE FROM Session WHERE id = ?`, [id]);
 }
 
 async function updateSessionProperty(id, property, value) {
-  const validProps = ["curentBet", "bank", "bigBlind", "smallBlind"];
-  if (!validProps.includes(property)) {
-    console.error("Недоступне поле для оновлення");
-    return;
-  }
+  const validProps = ["players", "curentBet", "bank", "bigBlind", "smallBlind"];
+  if (!validProps.includes(property)) return null;
 
   const db = await dbPromise;
-  await db.run(`UPDATE sessions SET ${property} = ? WHERE id = ?`, value, id);
+  const serialized =
+    Array.isArray(value) || typeof value === "object"
+      ? JSON.stringify(value)
+      : value;
+
+  await db.run(`UPDATE Session SET ${property} = ? WHERE id = ?`, [
+    serialized,
+    id,
+  ]);
 }
 
-//Usage
-async function usage() {
-  console.log("\n*** Створення нової сесії ***");
-  const session = await createSession("admin123", 1000, 10, 100, 5, 30);
-  console.log("Створена сесія:", session);
-
-  console.log("\n*** Отримання сесії за ID ***");
-  const loadedSession = await getSessionById(session.id);
-  console.log("Завантажена сесія:", loadedSession);
-
-  console.log("\n*** Оновлення поточної ставки ***");
-  await updateSessionProperty(session.id, "curentBet", 50);
-  console.log("Поточну ставку оновленно");
-
-  console.log("\n*** Отримання сесії після оновлення ***");
-  const updatedSession = await getSessionById(session.id);
-  console.log("Сесія після оновлення:", updatedSession);
-
-  console.log("\n*** Видалення сесії ***");
-  await deleteSession(session.id);
-  console.log("Сесію видалено");
-}
-
-usage();
+export {
+  createSession,
+  getSessionById,
+  deleteSession,
+  leaveSession,
+  joinSession,
+  updateSessionProperty,
+};
