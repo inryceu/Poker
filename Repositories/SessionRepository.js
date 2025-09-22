@@ -3,13 +3,13 @@
 import dbPromise from "../DB/db.js";
 
 async function createSession(admin, startBalance, minBet, maxBet, roundTime) {
-  const curentBet = minBet;
+  const currentBet = minBet;
   const raiseValue = minBet;
   const players = [admin];
 
   const db = await dbPromise;
   const result = await db.run(
-    `INSERT INTO Session (admin, players, startBalance, minBet, maxBet, curentBet, raiseValue, roundTime)
+    `INSERT INTO Session (admin, players, startBalance, minBet, maxBet, currentBet, raiseValue, roundTime)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       admin,
@@ -17,7 +17,7 @@ async function createSession(admin, startBalance, minBet, maxBet, roundTime) {
       startBalance,
       minBet,
       maxBet,
-      curentBet,
+      currentBet,
       raiseValue,
       roundTime,
     ]
@@ -30,7 +30,7 @@ async function createSession(admin, startBalance, minBet, maxBet, roundTime) {
     startBalance,
     minBet,
     maxBet,
-    curentBet,
+    currentBet,
     raiseValue,
     roundTime,
   };
@@ -38,7 +38,7 @@ async function createSession(admin, startBalance, minBet, maxBet, roundTime) {
 
 async function getSessionById(id) {
   const db = await dbPromise;
-  const row = await db.get(`SELECT * FROM Session WHERE id = ?`, id);
+  const row = await db.get(`SELECT * FROM Session WHERE id = ?`, [id]);
   if (!row) return null;
 
   row.players = row.players ? JSON.parse(row.players) : [];
@@ -81,7 +81,13 @@ async function deleteSession(id) {
 }
 
 async function updateSessionProperty(id, property, value) {
-  const validProps = ["players", "curentBet", "bank", "bigBlind", "smallBlind"];
+  const validProps = [
+    "players",
+    "currentBet",
+    "bank",
+    "bigBlind",
+    "smallBlind",
+  ];
   if (!validProps.includes(property)) return null;
 
   const db = await dbPromise;

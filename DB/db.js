@@ -29,7 +29,7 @@ async function initDB() {
       startBalance INTEGER NOT NULL,
       minBet INTEGER NOT NULL,
       maxBet INTEGER NOT NULL,
-      curentBet INTEGER NOT NULL,
+      currentBet INTEGER NOT NULL,
       raiseValue INTEGER NOT NULL,
       roundTime INTEGER NOT NULL
     )

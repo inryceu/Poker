@@ -1,16 +1,32 @@
 import { WebSocketServer } from "ws";
 import http from "http";
 import handlers from "./Handlers.js";
-import { AppError } from "./AppError.js";
+import createLoggingProxy from "./proxyLogger.js";
+import { AppError as AE } from "./AppError.js";
 
 const server = http.createServer();
 const wss = new WebSocketServer({ server });
+
+const AppError = createLoggingProxy(AE, { logErrorsOnly: true });
+const INTERVAL = 1000 * 60 * 5;
+const ctx = new Map();
 
 server.listen(8080, () => {
   console.log("WebSocket сервер працює на ws://localhost:8080");
 });
 
-const ctx = new Map();
+setInterval(() => {
+  for (const [key, player] of ctx.entries()) {
+    if (Date.now() - player.action > INTERVAL) {
+      const response = {
+        status: "unauth error",
+        message: "Ви занадто довго були неактивні",
+      };
+      player.ws.send(JSON.stringify(response));
+      ctx.delete(key);
+    }
+  }
+}, INTERVAL);
 
 wss.on("connection", (ws) => {
   console.log("Новий гравець підключився");
@@ -19,17 +35,17 @@ wss.on("connection", (ws) => {
     let response;
     try {
       const data = JSON.parse(message);
-      console.log("Отримано повідомлення:", data);
 
-      const handler = handlers[data.type];
+      const handler = createLoggingProxy(handlers[data.type], {
+        logErrorsOnly: true,
+      });
+
       if (!handler) {
         throw new AppError("Невідомий тип запиту");
       }
 
       response = await handler(ctx, data, ws);
     } catch (error) {
-      console.log("Помилка обробки повідомлення:", error.message);
-
       response = {
         status: error.status || "error",
         message: error.message || "Сталася невідома помилка",
